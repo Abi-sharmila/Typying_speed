@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Typing Test — Long Text Version</title>
+
+<style>
+  :root{
+    --bg:#eef2f3; --card:#fff; --text:#111827; --muted:#6b7280;
+    --accent:#2563eb; --good:#10b981; --bad:#ef4444; --progress-bg:#e6eefb;
+  }
+  [data-theme="dark"]{
+    --bg:#071026; --card:#071b2a; --text:#e6eef8; --muted:#9ca3af;
+    --accent:#7c3aed; --good:#34d399; --bad:#fb7185; --progress-bg:#08203a;
+  }
+  body{
+    margin:0;padding:20px;background:var(--bg);color:var(--text);
+    font-family:Inter,Arial;
+  }
+  .wrap{max-width:900px;margin:auto}
+  .card{background:var(--card);padding:16px;border-radius:12px;box-shadow:0 5px 20px rgba(0,0,0,0.1);margin-top:16px}
+  button{padding:8px 12px;border-radius:8px;border:none;cursor:pointer;font-size:14px}
+  button.primary{background:var(--accent);color:#fff}
+  button.ghost{background:transparent;color:var(--text);border:1px solid rgba(255,255,255,0.2)}
+  select,input,textarea{padding:8px;border-radius:8px;border:1px solid #ddd;background:transparent;color:var(--text)}
+  textarea{width:100%;min-height:150px;resize:none;font-size:16px}
+  .muted{color:var(--muted);font-size:14px;margin-top:4px}
+  .word{padding:2px;border-radius:4px}
+  .correct{color:var(--good)}
+  .wrong{color:var(--bad)}
+  .stats{margin-top:12px;display:flex;gap:10px;flex-wrap:wrap}
+  .stat{background:var(--progress-bg);padding:10px;border-radius:8px;min-width:110px;text-align:center}
+  .progressWrap{height:12px;background:var(--progress-bg);border-radius:10px;overflow:hidden;margin-top:10px}
+  .progressBar{height:100%;background:linear-gradient(90deg,var(--accent),#4f46e5);width:0%}
+</style>
+</head>
+
+<body data-theme="light">
+<div class="wrap">
+
+<h2>Typing Speed Test (Enhanced Long Text)</h2>
+<button id="themeToggle" class="ghost">Dark Mode</button>
+
+<div class="card">
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <label>Time</label>
+    <select id="timeSelect">
+      <option value="30">30 sec</option>
+      <option value="60" selected>60 sec</option>
+      <option value="90">90 sec</option>
+    </select>
+
+    <label>Difficulty</label>
+    <select id="difficulty">
+      <option value="easy">Easy</option>
+      <option value="medium">Medium</option>
+      <option value="hard">Hard</option>
+    </select>
+
+    <button id="startBtn" class="primary">Start</button>
+    <button id="restartBtn" class="ghost">Restart</button>
+
+    <label><input type="checkbox" id="soundToggle" checked> Typing sound</label>
+    <label><input type="checkbox" id="errorSound" checked> Error beep</label>
+  </div>
+
+  <h3 id="timerDisplay">60s</h3>
+  <div class="progressWrap"><div id="progressBar" class="progressBar"></div></div>
+
+  <div class="muted">Text to type:</div>
+  <div id="quoteBox" class="card" style="min-height:120px"></div>
+
+  <textarea id="inputArea" disabled placeholder="Start typing here..."></textarea>
+
+  <div class="stats">
+    <div class="stat"><div class="muted">WPM</div><strong id="wpm">0</strong></div>
+    <div class="stat"><div class="muted">Accuracy</div><strong id="accuracy">100%</strong></div>
+    <div class="stat"><div class="muted">Mistakes</div><strong id="mistakes">0</strong></div>
+    <div class="stat"><div class="muted">Chars</div><strong id="chars">0</strong></div>
+  </div>
+</div>
+</div>
+
+<script>
+/* --- LONGER TEXTS (UPDATED) --- */
+const TEXTS = {
+  easy: [
+    "Success comes from small actions repeated consistently every single day, and most people underestimate the value of tiny progress made regularly over long periods of time.",
+    "Discipline is not about forcing yourself to work; it is about creating an environment that naturally makes good habits easier and more enjoyable to follow."
+  ],
+  medium: [
+    "Many individuals dream about achieving greatness, but only a few are willing to embrace the slow and often uncomfortable journey required to transform those dreams into reality. True improvement comes not from occasional bursts of effort but from persistent dedication even when motivation fades.",
+    "When people focus solely on the outcome, they miss the beauty of progress and the lessons found in each step. Growth requires patience, reflection, and the courage to challenge your own limits again and again."
+  ],
+  hard: [
+    "In a world filled with distractions and rapid gratification, the ability to remain focused on meaningful long-term goals becomes a powerful advantage. Those who learn to delay comfort in exchange for future growth often discover levels of potential they never imagined existed within themselves.",
+    "The pursuit of mastery is not defined by flawless execution but by a relentless commitment to refinement. Every mistake becomes a stepping stone, and every failure provides insights that elevate future performance."
+  ]
+};
+
+let originalText = "", words = [];
+let timeTotal = 60, timeLeft = 60, timerInterval = null;
+let startTime = null;
+let audioCtx = null, clickGain = null, errorGain = null;
+
+const quoteBox = document.getElementById("quoteBox");
+const inputArea = document.getElementById("inputArea");
+const timerDisplay = document.getElementById("timerDisplay");
+const progressBar = document.getElementById("progressBar");
+const wpmEl = document.getElementById("wpm");
+const accuracyEl = document.getElementById("accuracy");
+const mistakesEl = document.getElementById("mistakes");
+const charsEl = document.getElementById("chars");
+const soundToggle = document.getElementById("soundToggle");
+const errorSoundToggle = document.getElementById("errorSound");
+
+/* --- AUDIO SETUP --- */
+function initAudio(){
+  if(audioCtx) return;
+  audioCtx = new AudioContext();
+  clickGain = audioCtx.createGain(); clickGain.gain.value = 0.03; clickGain.connect(audioCtx.destination);
+  errorGain = audioCtx.createGain(); errorGain.gain.value = 0.06; errorGain.connect(audioCtx.destination);
+}
+function clickSound(){
+  if(!soundToggle.checked) return;
+  initAudio();
+  const o = audioCtx.createOscillator();
+  o.frequency.value = 1000;
+  o.connect(clickGain);
+  o.start(); o.stop(audioCtx.currentTime + 0.03);
+}
+function errorSound(){
+  if(!soundToggle.checked || !errorSoundToggle.checked) return;
+  initAudio();
+  const o = audioCtx.createOscillator();
+  o.type = "square";
+  o.frequency.value = 300;
+  o.connect(errorGain);
+  o.start(); o.stop(audioCtx.currentTime + 0.12);
+}
+
+/* --- LOAD TEXT --- */
+function loadText(){
+  const level = document.getElementById("difficulty").value;
+  const list = TEXTS[level];
+  originalText = list[Math.floor(Math.random()*list.length)];
+  words = originalText.split(" ").filter(Boolean);
+  quoteBox.innerHTML = words.map(w=>`<span class='word'>${w}</span>`).join(" ");
+}
+
+/* --- START TEST --- */
+document.getElementById("startBtn").onclick = () => {
+  loadText();
+  inputArea.value = "";
+  inputArea.disabled = false;
+  inputArea.focus();
+
+  timeTotal = parseInt(document.getElementById("timeSelect").value);
+  timeLeft = timeTotal;
+  timerDisplay.textContent = timeLeft + "s";
+
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    timerDisplay.textContent = timeLeft + "s";
+    progressBar.style.width = ((timeTotal - timeLeft)/timeTotal)*100 + "%";
+    if(timeLeft <= 0) finishTest();
+  }, 1000);
+
+  startTime = Date.now();
+};
+
+function finishTest(){
+  clearInterval(timerInterval);
+  inputArea.disabled = true;
+  timerDisplay.textContent = "Time's up!";
+  progressBar.style.width = "100%";
+}
+
+/* --- LIVE METRICS --- */
+inputArea.addEventListener("keydown", () => clickSound());
+
+inputArea.addEventListener("input", () => {
+  const typed = inputArea.value.trim();
+  const typedWords = typed.length? typed.split(" ") : [];
+  let correct=0, wrong=0;
+
+  words.forEach((w,i)=>{
+    if(!typedWords[i]) return;
+    if(typedWords[i]===w) correct++; else wrong++;
+  });
+
+  accuracyEl.textContent = Math.round((correct/words.length)*100) + "%";
+  mistakesEl.textContent = wrong;
+  charsEl.textContent = inputArea.value.length;
+
+  const mins = (Date.now()-startTime)/60000;
+  wpmEl.textContent = Math.round(correct/mins);
+
+  // update highlight
+  quoteBox.innerHTML = words.map((w,i)=>{
+    if(!typedWords[i]) return `<span class='word'>${w}</span>`;
+    return `<span class='word ${typedWords[i]==w ? "correct":"wrong"}'>${w}</span>`;
+  }).join(" ");
+
+  // error beep
+  if(typedWords.length>0){
+    const i = typedWords.length-1;
+    if(typedWords[i] !== words[i]) errorSound();
+  }
+});
+
+/* --- THEME MODE --- */
+document.getElementById("themeToggle").onclick = () => {
+  const body = document.body;
+  if(body.dataset.theme === "dark"){ 
+    body.dataset.theme = "light"; 
+    themeToggle.textContent = "Dark Mode";
+  } else {
+    body.dataset.theme = "dark"; 
+    themeToggle.textContent = "Light Mode";
+  }
+};
+
+/* --- RESTART --- */
+document.getElementById("restartBtn").onclick = () => {
+  location.reload();
+};
+</script>
+</body>
+</html>
