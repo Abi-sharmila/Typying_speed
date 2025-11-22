@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Typing Test — Long Text Version</title>
+<title>Typing Test — No Sound</title>
 
 <style>
   :root{
@@ -39,7 +39,7 @@
 <body data-theme="light">
 <div class="wrap">
 
-<h2>Typing Speed Test (Enhanced Long Text)</h2>
+<h2>Typing Speed Test (No Sound Version)</h2>
 <button id="themeToggle" class="ghost">Dark Mode</button>
 
 <div class="card">
@@ -61,8 +61,7 @@
     <button id="startBtn" class="primary">Start</button>
     <button id="restartBtn" class="ghost">Restart</button>
 
-    <label><input type="checkbox" id="soundToggle" checked> Typing sound</label>
-    <label><input type="checkbox" id="errorSound" checked> Error beep</label>
+    <!-- Removed sound toggle checkboxes -->
   </div>
 
   <h3 id="timerDisplay">60s</h3>
@@ -83,7 +82,7 @@
 </div>
 
 <script>
-/* --- LONGER TEXTS (UPDATED) --- */
+/* --- LONGER TEXTS --- */
 const TEXTS = {
   easy: [
     "Success comes from small actions repeated consistently every single day, and most people underestimate the value of tiny progress made regularly over long periods of time.",
@@ -102,7 +101,6 @@ const TEXTS = {
 let originalText = "", words = [];
 let timeTotal = 60, timeLeft = 60, timerInterval = null;
 let startTime = null;
-let audioCtx = null, clickGain = null, errorGain = null;
 
 const quoteBox = document.getElementById("quoteBox");
 const inputArea = document.getElementById("inputArea");
@@ -112,33 +110,6 @@ const wpmEl = document.getElementById("wpm");
 const accuracyEl = document.getElementById("accuracy");
 const mistakesEl = document.getElementById("mistakes");
 const charsEl = document.getElementById("chars");
-const soundToggle = document.getElementById("soundToggle");
-const errorSoundToggle = document.getElementById("errorSound");
-
-/* --- AUDIO SETUP --- */
-function initAudio(){
-  if(audioCtx) return;
-  audioCtx = new AudioContext();
-  clickGain = audioCtx.createGain(); clickGain.gain.value = 0.03; clickGain.connect(audioCtx.destination);
-  errorGain = audioCtx.createGain(); errorGain.gain.value = 0.06; errorGain.connect(audioCtx.destination);
-}
-function clickSound(){
-  if(!soundToggle.checked) return;
-  initAudio();
-  const o = audioCtx.createOscillator();
-  o.frequency.value = 1000;
-  o.connect(clickGain);
-  o.start(); o.stop(audioCtx.currentTime + 0.03);
-}
-function errorSound(){
-  if(!soundToggle.checked || !errorSoundToggle.checked) return;
-  initAudio();
-  const o = audioCtx.createOscillator();
-  o.type = "square";
-  o.frequency.value = 300;
-  o.connect(errorGain);
-  o.start(); o.stop(audioCtx.currentTime + 0.12);
-}
 
 /* --- LOAD TEXT --- */
 function loadText(){
@@ -179,8 +150,6 @@ function finishTest(){
 }
 
 /* --- LIVE METRICS --- */
-inputArea.addEventListener("keydown", () => clickSound());
-
 inputArea.addEventListener("input", () => {
   const typed = inputArea.value.trim();
   const typedWords = typed.length? typed.split(" ") : [];
@@ -198,17 +167,10 @@ inputArea.addEventListener("input", () => {
   const mins = (Date.now()-startTime)/60000;
   wpmEl.textContent = Math.round(correct/mins);
 
-  // update highlight
   quoteBox.innerHTML = words.map((w,i)=>{
     if(!typedWords[i]) return `<span class='word'>${w}</span>`;
     return `<span class='word ${typedWords[i]==w ? "correct":"wrong"}'>${w}</span>`;
   }).join(" ");
-
-  // error beep
-  if(typedWords.length>0){
-    const i = typedWords.length-1;
-    if(typedWords[i] !== words[i]) errorSound();
-  }
 });
 
 /* --- THEME MODE --- */
